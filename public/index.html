@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vestaboard Note Editor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 24px;
+      gap: 24px;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+
+    /* ── Board ──────────────────────────────────────────── */
+    #board-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(15, 1fr);
+      gap: 4px;
+      max-width: 780px;
+    }
+
+    .cell {
+      aspect-ratio: 1 / 1.3;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: bold;
+      cursor: default;
+      border: 2px solid transparent;
+      transition: border-color 0.1s;
+      user-select: none;
+      position: relative;
+    }
+
+    /* colour chip display colours */
+    .cell[data-code="0"]  { background: #1a1a1a; color: #444; }
+    .cell[data-code="63"] { background: #c0392b; color: #fff; }
+    .cell[data-code="64"] { background: #e67e22; color: #fff; }
+    .cell[data-code="65"] { background: #f1c40f; color: #222; }
+    .cell[data-code="66"] { background: #27ae60; color: #fff; }
+    .cell[data-code="67"] { background: #2980b9; color: #fff; }
+    .cell[data-code="68"] { background: #8e44ad; color: #fff; }
+    .cell[data-code="69"] { background: #ecf0f1; color: #222; }
+    .cell[data-code="70"] { background: #1a1a1a; color: #888; }
+    .cell[data-code="71"] { background: #f5f5f5; color: #222; }
+
+    /* letters / symbols / numbers default */
+    .cell:not([data-code="0"]):not([data-code="63"]):not([data-code="64"]):not([data-code="65"]):not([data-code="66"]):not([data-code="67"]):not([data-code="68"]):not([data-code="69"]):not([data-code="70"]):not([data-code="71"]) {
+      background: #2a2a2a;
+      color: #e0e0e0;
+    }
+
+    .cell.active {
+      border-color: #f0a500;
+      box-shadow: 0 0 0 1px #f0a500;
+    }
+
+    .cell.invalid {
+      background: #3a1a1a !important;
+      color: #c0392b !important;
+      background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 4px,
+        rgba(192, 57, 43, 0.15) 4px,
+        rgba(192, 57, 43, 0.15) 8px
+      ) !important;
+    }
+
+    .cell.invalid .code-label {
+      color: #c0392b;
+      opacity: 0.9;
+    }
+
+    .cell .code-label {
+      font-size: 0.55rem;
+      position: absolute;
+      bottom: 2px;
+      right: 3px;
+      opacity: 0.5;
+      line-height: 1;
+    }
+
+    .cell .char-label {
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+
+    /* ── Controls hint ──────────────────────────────────── */
+    #controls {
+      font-size: 0.75rem;
+      color: #666;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      max-width: 780px;
+    }
+
+    #controls span b {
+      color: #aaa;
+    }
+
+    /* ── Debug panel ────────────────────────────────────── */
+    #debug-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 780px;
+      flex: 1;
+    }
+
+    #debug-section h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+    }
+
+    .debug-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .debug-block label {
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .debug-block pre {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 0.72rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #c5e57c;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="board-section">
+    <h1>Vestaboard Note Editor &mdash; 3 &times; 15</h1>
+    <div id="board"></div>
+    <div id="controls">
+      <span><b>&#8592; &#8594;</b> move cell</span>
+      <span><b>&#8593; &#8595;</b> change code</span>
+      <span><b>Shift + &#8593;&#8595;</b> jump +10 / -10</span>
+      <span><b>0&ndash;9 / type</b> enter code directly</span>
+    </div>
+  </div>
+
+  <div id="debug-section">
+    <h2>API Debug Output</h2>
+
+    <div class="debug-block">
+      <label>Cloud API &mdash; POST https://cloud.vestaboard.com/ &nbsp;&nbsp; body:</label>
+      <pre id="cloud-output"></pre>
+    </div>
+
+    <div class="debug-block">
+      <label>Local API &mdash; POST http://&lt;board-ip&gt;:7000/local-message &nbsp;&nbsp; body:</label>
+      <pre id="local-output"></pre>
+    </div>
+  </div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const ROWS = 3;
+  const COLS = 15;
+  const TOTAL = ROWS * COLS; // 45
+  const MAX_CODE = 71;
+
+  // Valid character codes per https://docs.vestaboard.com/docs/characterCodes
+  // Gaps in the 0-71 range: 43, 45, 51, 57, 58, 61
+  const VALID_CODES = new Set([
+    0,
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,
+    27,28,29,30,31,32,33,34,35,36,
+    37,38,39,40,41,42,
+    44,46,47,48,49,50,
+    52,53,54,55,56,
+    59,60,62,
+    63,64,65,66,67,68,69,70,71,
+  ]);
+
+  // ── URL persistence ────────────────────────────────────────────────────────
+  function saveToURL() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('b', grid.join(','));
+    history.replaceState(null, '', '?' + params.toString());
+  }
+
+  function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('b');
+    if (!raw) return;
+    const values = raw.split(',').map(Number);
+    if (values.length !== TOTAL) return;
+    for (let i = 0; i < TOTAL; i++) {
+      const v = values[i];
+      if (Number.isInteger(v) && v >= 0 && v <= MAX_CODE) {
+        grid[i] = v;
+      }
+    }
+  }
+
+  // Initialise grid to all zeros, then restore from URL if present
+  const grid = Array.from({ length: TOTAL }, () => 0);
+  let cursor = 0; // linear index
+  loadFromURL();
+
+  // ── Character code → display label map ────────────────────────────────────
+  const CODE_CHARS = {
+    0: '',
+    1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H',
+    9: 'I', 10: 'J', 11: 'K', 12: 'L', 13: 'M', 14: 'N', 15: 'O', 16: 'P',
+    17: 'Q', 18: 'R', 19: 'S', 20: 'T', 21: 'U', 22: 'V', 23: 'W', 24: 'X',
+    25: 'Y', 26: 'Z',
+    27: '1', 28: '2', 29: '3', 30: '4', 31: '5',
+    32: '6', 33: '7', 34: '8', 35: '9', 36: '0',
+    37: '!', 38: '@', 39: '#', 40: '$', 41: '(', 42: ')',
+    44: '-', 46: '+', 47: '&', 48: '=', 49: ';', 50: ':',
+    52: "'", 53: '"', 54: '%', 55: ',', 56: '.', 59: '/', 60: '?',
+    62: '°',
+    63: 'RED', 64: 'ORG', 65: 'YEL', 66: 'GRN', 67: 'BLU', 68: 'VIO',
+    69: 'WHT', 70: 'BLK', 71: 'FIL',
+  };
+
+  // ── Build DOM ──────────────────────────────────────────────────────────────
+  const boardEl = document.getElementById('board');
+  const cellEls = [];
+
+  for (let i = 0; i < TOTAL; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.setAttribute('data-index', i);
+
+    const charSpan = document.createElement('span');
+    charSpan.className = 'char-label';
+
+    const codeSpan = document.createElement('span');
+    codeSpan.className = 'code-label';
+
+    cell.appendChild(charSpan);
+    cell.appendChild(codeSpan);
+
+    cell.addEventListener('click', () => {
+      cursor = i;
+      render();
+    });
+
+    boardEl.appendChild(cell);
+    cellEls.push(cell);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function render() {
+    for (let i = 0; i < TOTAL; i++) {
+      const code = grid[i];
+      const el = cellEls[i];
+
+      // Update data-code for CSS colour chips
+      const isValid = VALID_CODES.has(code);
+      el.setAttribute('data-code', isValid ? code : 'invalid');
+      el.classList.toggle('active', i === cursor);
+      el.classList.toggle('invalid', !isValid);
+
+      el.querySelector('.char-label').textContent = isValid ? (CODE_CHARS[code] ?? '') : '?';
+      el.querySelector('.code-label').textContent = code;
+    }
+    renderDebug();
+    saveToURL();
+  }
+
+  function renderDebug() {
+    // Build 2D array (3 rows × 15 cols)
+    const rows = [];
+    for (let r = 0; r < ROWS; r++) {
+      rows.push(grid.slice(r * COLS, r * COLS + COLS));
+    }
+
+    const cloudBody = { characters: rows };
+    const localBody = rows; // raw array of arrays
+
+    document.getElementById('cloud-output').textContent =
+      JSON.stringify(cloudBody, null, 2);
+    document.getElementById('local-output').textContent =
+      JSON.stringify(localBody, null, 2);
+  }
+
+  // ── Keyboard ───────────────────────────────────────────────────────────────
+  let digitBuffer = '';
+  let digitTimer = null;
+
+  function commitDigitBuffer() {
+    if (digitBuffer === '') return;
+    const code = parseInt(digitBuffer, 10);
+    if (!isNaN(code) && code >= 0 && code <= MAX_CODE) {
+      grid[cursor] = code;
+      render();
+    }
+    digitBuffer = '';
+    digitTimer = null;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const { key, shiftKey } = e;
+
+    // Prevent page scroll on arrow keys
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) {
+      e.preventDefault();
+    }
+
+    // ── Digit input ──────────────────────────────────────
+    if (/^\d$/.test(key)) {
+      clearTimeout(digitTimer);
+      digitBuffer += key;
+      // Auto-commit if buffer would exceed 2 digits or value > 71
+      const tentative = parseInt(digitBuffer, 10);
+      if (digitBuffer.length >= 2 || tentative > 71) {
+        if (digitBuffer.length > 1) {
+          // check if last digit made it invalid
+          const prev = parseInt(digitBuffer.slice(0, -1), 10);
+          if (prev >= 0 && prev <= MAX_CODE) {
+            // commit previous, start fresh with new digit
+            const newDigit = key;
+            digitBuffer = digitBuffer.slice(0, -1);
+            commitDigitBuffer();
+            digitBuffer = newDigit;
+          } else {
+            commitDigitBuffer();
+          }
+        } else {
+          commitDigitBuffer();
+        }
+      }
+      // Wait 600 ms for more digits
+      digitTimer = setTimeout(commitDigitBuffer, 600);
+      return;
+    }
+
+    // Commit any pending digit on non-digit key
+    if (digitTimer) {
+      clearTimeout(digitTimer);
+      commitDigitBuffer();
+    }
+
+    switch (key) {
+      case 'ArrowRight': {
+        cursor = (cursor + 1) % TOTAL;
+        break;
+      }
+      case 'ArrowLeft': {
+        cursor = (cursor - 1 + TOTAL) % TOTAL;
+        break;
+      }
+      case 'ArrowUp': {
+        const step = shiftKey ? 10 : 1;
+        grid[cursor] = (grid[cursor] + step) % (MAX_CODE + 1);
+        break;
+      }
+      case 'ArrowDown': {
+        const step = shiftKey ? 10 : 1;
+        grid[cursor] = (grid[cursor] - step + MAX_CODE + 1) % (MAX_CODE + 1);
+        break;
+      }
+      default:
+        return;
+    }
+
+    render();
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  render();
+</script>
+</body>
+</html>
