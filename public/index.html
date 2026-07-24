@@ -81,6 +81,19 @@
       transition: border-color 0.1s;
       user-select: none;
       position: relative;
+      overflow: hidden;
+    }
+
+    /* Split-flap flip — top half folds down */
+    @keyframes flap {
+      0%   { transform: scaleY(1);    opacity: 1; }
+      40%  { transform: scaleY(0.05); opacity: 0.6; }
+      60%  { transform: scaleY(0.05); opacity: 0.6; }
+      100% { transform: scaleY(1);    opacity: 1; }
+    }
+
+    .cell.flipping {
+      animation: flap 80ms ease-in-out;
     }
 
     /* colour chip display colours */
@@ -540,20 +553,119 @@ Funhouse</textarea>
     cellEls.push(cell);
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-  function renderBoard(displayGrid = null) {
-    const src = displayGrid ?? grid;
+  // ── Flip animation ─────────────────────────────────────────────────────────
+  // Track what each cell is currently displaying so we know what changed
+  const displayedCodes = Array.from({ length: TOTAL }, () => 0);
+
+  // All valid codes in order — this is the "wheel" the flap cycles through
+  const ORDERED_CODES = [
+    0,
+    1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,
+    27,28,29,30,31,32,33,34,35,36,
+    37,38,39,40,41,42,
+    44,46,47,48,49,50,
+    52,53,54,55,56,
+    59,60,62,
+    63,64,65,66,67,68,69,70,71,
+  ];
+
+  let flipIntervalId = null;
+
+  // Immediately set a cell's visual state with no animation
+  function setCellValue(i, code) {
+    const el = cellEls[i];
+    const isValid = VALID_CODES.has(code);
+    el.setAttribute('data-code', isValid ? code : 'invalid');
+    el.classList.toggle('invalid', !isValid);
+    el.querySelector('.char-label').textContent = isValid ? (CODE_CHARS[code] ?? '') : '?';
+    el.querySelector('.code-label').textContent = code;
+    displayedCodes[i] = code;
+  }
+
+  // Trigger a single CSS flap on a cell
+  function triggerFlap(el) {
+    el.classList.remove('flipping');
+    // Force reflow so removing+re-adding the class restarts the animation
+    void el.offsetWidth;
+    el.classList.add('flipping');
+  }
+
+  // Animate cells that are changing to their new target codes.
+  // Each cell steps forward through ORDERED_CODES one code at a time toward its target.
+  function animateCells(targetGrid) {
+    // Stop any in-progress animation
+    if (flipIntervalId) { clearInterval(flipIntervalId); flipIntervalId = null; }
+
+    const STEP_MS = 40; // ms per flap tick
+
+    // Identify which cells are changing and build their full step sequences
+    const changing = []; // { index, steps: [code, ...] }
+
     for (let i = 0; i < TOTAL; i++) {
-      const code = src[i];
-      const el = cellEls[i];
-      const isValid = VALID_CODES.has(code);
+      const from = displayedCodes[i];
+      const to   = targetGrid[i];
+      if (from === to) continue;
 
-      el.setAttribute('data-code', isValid ? code : 'invalid');
-      el.classList.toggle('active', currentMode === 'editor' && i === cursor);
-      el.classList.toggle('invalid', !isValid);
+      const fromIdx = ORDERED_CODES.indexOf(from);
+      const toIdx   = ORDERED_CODES.indexOf(to);
+      const len     = ORDERED_CODES.length;
 
-      el.querySelector('.char-label').textContent = isValid ? (CODE_CHARS[code] ?? '') : '?';
-      el.querySelector('.code-label').textContent = code;
+      // Walk forward on the wheel from fromIdx+1 up to and including toIdx
+      const steps = [];
+      let idx = (fromIdx + 1) % len;
+      while (true) {
+        steps.push(ORDERED_CODES[idx]);
+        if (idx === toIdx) break;
+        idx = (idx + 1) % len;
+      }
+
+      changing.push({ index: i, steps });
+    }
+
+    if (changing.length === 0) return;
+
+    // All cells share the same tick count — use the longest sequence so every
+    // cell finishes at the same time, skipping intermediate frames for shorter ones.
+    const maxSteps = Math.max(...changing.map(c => c.steps.length));
+
+    let tick = 0;
+    flipIntervalId = setInterval(() => {
+      tick++;
+      for (const { index, steps } of changing) {
+        // Map this tick proportionally into this cell's step sequence so all
+        // cells start and finish together, each stepping through its own codes
+        const pos = Math.min(
+          Math.round((tick / maxSteps) * steps.length) - 1,
+          steps.length - 1
+        );
+        const code = steps[Math.max(pos, 0)];
+        setCellValue(index, code);
+        triggerFlap(cellEls[index]);
+      }
+      if (tick >= maxSteps) {
+        clearInterval(flipIntervalId);
+        flipIntervalId = null;
+        // Guarantee every cell lands exactly on its target
+        for (const { index, steps } of changing) {
+          setCellValue(index, steps[steps.length - 1]);
+        }
+      }
+    }, STEP_MS);
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function renderBoard(targetGrid, animate = false) {
+    const src = targetGrid ?? grid;
+
+    if (animate) {
+      animateCells(src);
+    } else {
+      for (let i = 0; i < TOTAL; i++) setCellValue(i, src[i]);
+    }
+
+    // Active cell highlight is always immediate
+    for (let i = 0; i < TOTAL; i++) {
+      cellEls[i].classList.toggle('active', currentMode === 'editor' && i === cursor);
     }
   }
 
@@ -563,8 +675,8 @@ Funhouse</textarea>
     document.getElementById('local-output').textContent = JSON.stringify(rows, null, 2);
   }
 
-  function renderEditor() {
-    renderBoard();
+  function renderEditor(animate = true) {
+    renderBoard(grid, animate);
     const rows = [];
     for (let r = 0; r < ROWS; r++) rows.push(grid.slice(r * COLS, r * COLS + COLS));
     renderDebug(rows);
@@ -579,7 +691,7 @@ Funhouse</textarea>
       .filter(s => s.length > 0);
   }
 
-  function renderDisplayFrame() {
+  function renderDisplayFrame(animate = true) {
     const games = getGames();
     if (games.length === 0) return;
 
@@ -596,18 +708,18 @@ Funhouse</textarea>
     const row2 = scoreToRow(p2name, p2score);
 
     const displayGrid = [...row0, ...row1, ...row2];
-    renderBoard(displayGrid);
+    renderBoard(displayGrid, animate);
     renderDebug([row0, row1, row2]);
     saveToURL();
   }
 
-  function startDisplayRotation() {
+  function startDisplayRotation(initial = false) {
     stopDisplayRotation();
-    renderDisplayFrame();
+    renderDisplayFrame(!initial);
     displayTimer = setInterval(() => {
       const games = getGames();
       if (games.length > 1) displayGameIndex = (displayGameIndex + 1) % games.length;
-      renderDisplayFrame();
+      renderDisplayFrame(true);
     }, 5000);
   }
 
@@ -616,7 +728,7 @@ Funhouse</textarea>
   }
 
   // ── Mode switching ─────────────────────────────────────────────────────────
-  function applyMode(mode) {
+  function applyMode(mode, initial = false) {
     currentMode = mode;
     modeSelect.value = mode;
 
@@ -625,13 +737,13 @@ Funhouse</textarea>
       controlsEl.classList.remove('hidden');
       sdPanel.classList.add('hidden');
       stopDisplayRotation();
-      renderEditor();
+      renderEditor(!initial);
     } else {
       boardTitle.textContent = 'Vestaboard Note Preview — Score Display';
       controlsEl.classList.add('hidden');
       sdPanel.classList.remove('hidden');
       displayGameIndex = 0;
-      startDisplayRotation();
+      startDisplayRotation(initial);
     }
   }
 
@@ -720,7 +832,7 @@ Funhouse</textarea>
 
   // ── Init ───────────────────────────────────────────────────────────────────
   loadFromURL();
-  applyMode(currentMode);
+  applyMode(currentMode, true);
 </script>
 </body>
 </html>
