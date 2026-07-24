@@ -15,7 +15,7 @@
       flex-direction: column;
       min-height: 100vh;
       padding: 24px;
-      gap: 24px;
+      gap: 20px;
     }
 
     h1 {
@@ -24,6 +24,35 @@
       color: #aaa;
       text-transform: uppercase;
     }
+
+    /* ── Mode bar ───────────────────────────────────────── */
+    #mode-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 780px;
+    }
+
+    #mode-bar label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    #mode-select {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    #mode-select:focus { outline: 1px solid #f0a500; }
 
     /* ── Board ──────────────────────────────────────────── */
     #board-section {
@@ -118,8 +147,115 @@
       max-width: 780px;
     }
 
-    #controls span b {
-      color: #aaa;
+    #controls span b { color: #aaa; }
+
+    /* ── Score Display mode panel ───────────────────────── */
+    #score-display-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 780px;
+    }
+
+    #score-display-panel h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+    }
+
+    .sd-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .sd-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sd-field label {
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .sd-field input, .sd-field textarea {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-family: inherit;
+      font-size: 0.82rem;
+    }
+
+    .sd-field input:focus, .sd-field textarea:focus {
+      outline: 1px solid #f0a500;
+    }
+
+    .sd-field textarea {
+      resize: vertical;
+      min-height: 90px;
+      width: 220px;
+    }
+
+    .sd-field input[type="text"] { width: 160px; }
+    .sd-field input[type="number"] { width: 110px; }
+
+    .score-entry {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+
+    .score-entry label {
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .score-entry input[type="text"] {
+      background: #222;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      width: 120px;
+    }
+
+    .score-entry input[type="number"] {
+      background: #222;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 4px 6px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      width: 100px;
+    }
+
+    .score-entry input:focus { outline: 1px solid #f0a500; }
+
+    #rotation-status {
+      font-size: 0.72rem;
+      color: #555;
+    }
+
+    #rotation-status span {
+      color: #f0a500;
     }
 
     /* ── Debug panel ────────────────────────────────────── */
@@ -164,12 +300,24 @@
       max-height: 220px;
       overflow-y: auto;
     }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
+  <!-- Mode selector -->
+  <div id="mode-bar">
+    <label for="mode-select">Mode</label>
+    <select id="mode-select">
+      <option value="editor">Enter Score</option>
+      <option value="display">Score Display</option>
+    </select>
+  </div>
+
+  <!-- Board preview (shared by both modes) -->
   <div id="board-section">
-    <h1>Vestaboard Note Editor &mdash; 3 &times; 15</h1>
+    <h1 id="board-title">Vestaboard Note Editor &mdash; 3 &times; 15</h1>
     <div id="board"></div>
     <div id="controls">
       <span><b>&#8592; &#8594;</b> move cell</span>
@@ -179,6 +327,38 @@
     </div>
   </div>
 
+  <!-- Score Display mode controls -->
+  <div id="score-display-panel" class="hidden">
+    <h2>Score Display Settings</h2>
+
+    <div class="sd-row">
+      <div class="sd-field">
+        <label>Pinball Game Names (one per line)</label>
+        <textarea id="game-names">Attack From Mars
+Medieval Madness
+The Addams Family
+Twilight Zone
+Funhouse</textarea>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="score-entry">
+          <label>#1</label>
+          <input type="text" id="p1-name" placeholder="Player name" value="ACE" maxlength="10" />
+          <input type="number" id="p1-score" placeholder="Score" value="1250000" min="0" />
+        </div>
+        <div class="score-entry">
+          <label>#2</label>
+          <input type="text" id="p2-name" placeholder="Player name" value="BOB" maxlength="10" />
+          <input type="number" id="p2-score" placeholder="Score" value="980000" min="0" />
+        </div>
+      </div>
+    </div>
+
+    <div id="rotation-status">Showing: <span id="current-game-name">&mdash;</span></div>
+  </div>
+
+  <!-- Debug panel (shared) -->
   <div id="debug-section">
     <h2>API Debug Output</h2>
 
@@ -194,7 +374,7 @@
   </div>
 
 <script>
-  // ── State ──────────────────────────────────────────────────────────────────
+  // ── Constants ──────────────────────────────────────────────────────────────
   const ROWS = 3;
   const COLS = 15;
   const TOTAL = ROWS * COLS; // 45
@@ -213,33 +393,7 @@
     63,64,65,66,67,68,69,70,71,
   ]);
 
-  // ── URL persistence ────────────────────────────────────────────────────────
-  function saveToURL() {
-    const params = new URLSearchParams(window.location.search);
-    params.set('b', grid.join(','));
-    history.replaceState(null, '', '?' + params.toString());
-  }
-
-  function loadFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get('b');
-    if (!raw) return;
-    const values = raw.split(',').map(Number);
-    if (values.length !== TOTAL) return;
-    for (let i = 0; i < TOTAL; i++) {
-      const v = values[i];
-      if (Number.isInteger(v) && v >= 0 && v <= MAX_CODE) {
-        grid[i] = v;
-      }
-    }
-  }
-
-  // Initialise grid to all zeros, then restore from URL if present
-  const grid = Array.from({ length: TOTAL }, () => 0);
-  let cursor = 0; // linear index
-  loadFromURL();
-
-  // ── Character code → display label map ────────────────────────────────────
+  // ── Character maps ─────────────────────────────────────────────────────────
   const CODE_CHARS = {
     0: '',
     1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H',
@@ -256,10 +410,115 @@
     69: 'WHT', 70: 'BLK', 71: 'FIL',
   };
 
-  // ── Build DOM ──────────────────────────────────────────────────────────────
-  const boardEl = document.getElementById('board');
-  const cellEls = [];
+  // Map from a printable character → Vestaboard code
+  const CHAR_TO_CODE = {
+    ' ': 0,
+    'A':1,'B':2,'C':3,'D':4,'E':5,'F':6,'G':7,'H':8,'I':9,'J':10,
+    'K':11,'L':12,'M':13,'N':14,'O':15,'P':16,'Q':17,'R':18,'S':19,
+    'T':20,'U':21,'V':22,'W':23,'X':24,'Y':25,'Z':26,
+    '1':27,'2':28,'3':29,'4':30,'5':31,'6':32,'7':33,'8':34,'9':35,'0':36,
+    '!':37,'@':38,'#':39,'$':40,'(':41,')':42,'-':44,'+':46,'&':47,
+    '=':48,';':49,':':50,"'":52,'"':53,'%':54,',':55,'.':56,'/':59,'?':60,
+  };
 
+  // Convert a plain string to a 15-element code array (centered, truncated)
+  function textToRow(text, width = COLS) {
+    const upper = text.toUpperCase().slice(0, width);
+    const padTotal = width - upper.length;
+    const padLeft = Math.floor(padTotal / 2);
+    const padRight = padTotal - padLeft;
+    const padded = ' '.repeat(padLeft) + upper + ' '.repeat(padRight);
+    return Array.from(padded).map(ch => CHAR_TO_CODE[ch] ?? 0);
+  }
+
+  // Format a score+name into a 15-char row: "NAME   1250000" right-aligned score
+  function scoreToRow(name, score, width = COLS) {
+    const nameUp = name.toUpperCase().slice(0, 8);
+    const scoreStr = String(score);
+    const gap = width - nameUp.length - scoreStr.length;
+    let line;
+    if (gap >= 1) {
+      line = nameUp + ' '.repeat(gap) + scoreStr;
+    } else {
+      // Truncate name to fit
+      const maxName = width - scoreStr.length - 1;
+      line = nameUp.slice(0, Math.max(maxName, 0)) + ' ' + scoreStr;
+      line = line.slice(0, width);
+    }
+    return Array.from(line.padEnd(width).slice(0, width))
+      .map(ch => CHAR_TO_CODE[ch] ?? 0);
+  }
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const grid = Array.from({ length: TOTAL }, () => 0);
+  let cursor = 0;
+  let currentMode = 'editor'; // 'editor' | 'display'
+  let displayGameIndex = 0;
+  let displayTimer = null;
+
+  // ── URL persistence ────────────────────────────────────────────────────────
+  function saveToURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    params.set('mode', currentMode);
+
+    if (currentMode === 'editor') {
+      params.set('b', grid.join(','));
+      params.delete('games');
+      params.delete('p1n'); params.delete('p1s');
+      params.delete('p2n'); params.delete('p2s');
+    } else {
+      params.delete('b');
+      params.set('games', encodeURIComponent(document.getElementById('game-names').value));
+      params.set('p1n', document.getElementById('p1-name').value);
+      params.set('p1s', document.getElementById('p1-score').value);
+      params.set('p2n', document.getElementById('p2-name').value);
+      params.set('p2s', document.getElementById('p2-score').value);
+    }
+
+    history.replaceState(null, '', '?' + params.toString());
+  }
+
+  function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    // Mode
+    const savedMode = params.get('mode');
+    if (savedMode === 'display' || savedMode === 'editor') {
+      currentMode = savedMode;
+    }
+
+    // Editor grid
+    const raw = params.get('b');
+    if (raw) {
+      const values = raw.split(',').map(Number);
+      if (values.length === TOTAL) {
+        for (let i = 0; i < TOTAL; i++) {
+          const v = values[i];
+          if (Number.isInteger(v) && v >= 0 && v <= MAX_CODE) grid[i] = v;
+        }
+      }
+    }
+
+    // Display mode fields
+    if (params.get('games')) {
+      document.getElementById('game-names').value = decodeURIComponent(params.get('games'));
+    }
+    if (params.get('p1n')) document.getElementById('p1-name').value = params.get('p1n');
+    if (params.get('p1s')) document.getElementById('p1-score').value = params.get('p1s');
+    if (params.get('p2n')) document.getElementById('p2-name').value = params.get('p2n');
+    if (params.get('p2s')) document.getElementById('p2-score').value = params.get('p2s');
+  }
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const boardEl      = document.getElementById('board');
+  const boardTitle   = document.getElementById('board-title');
+  const controlsEl   = document.getElementById('controls');
+  const modeSelect   = document.getElementById('mode-select');
+  const sdPanel      = document.getElementById('score-display-panel');
+  const cellEls      = [];
+
+  // Build board cells
   for (let i = 0; i < TOTAL; i++) {
     const cell = document.createElement('div');
     cell.className = 'cell';
@@ -267,7 +526,6 @@
 
     const charSpan = document.createElement('span');
     charSpan.className = 'char-label';
-
     const codeSpan = document.createElement('span');
     codeSpan.className = 'code-label';
 
@@ -275,8 +533,7 @@
     cell.appendChild(codeSpan);
 
     cell.addEventListener('click', () => {
-      cursor = i;
-      render();
+      if (currentMode === 'editor') { cursor = i; renderBoard(); }
     });
 
     boardEl.appendChild(cell);
@@ -284,41 +541,114 @@
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  function render() {
+  function renderBoard(displayGrid = null) {
+    const src = displayGrid ?? grid;
     for (let i = 0; i < TOTAL; i++) {
-      const code = grid[i];
+      const code = src[i];
       const el = cellEls[i];
-
-      // Update data-code for CSS colour chips
       const isValid = VALID_CODES.has(code);
+
       el.setAttribute('data-code', isValid ? code : 'invalid');
-      el.classList.toggle('active', i === cursor);
+      el.classList.toggle('active', currentMode === 'editor' && i === cursor);
       el.classList.toggle('invalid', !isValid);
 
       el.querySelector('.char-label').textContent = isValid ? (CODE_CHARS[code] ?? '') : '?';
       el.querySelector('.code-label').textContent = code;
     }
-    renderDebug();
+  }
+
+  function renderDebug(rows) {
+    const cloudBody = { characters: rows };
+    document.getElementById('cloud-output').textContent = JSON.stringify(cloudBody, null, 2);
+    document.getElementById('local-output').textContent = JSON.stringify(rows, null, 2);
+  }
+
+  function renderEditor() {
+    renderBoard();
+    const rows = [];
+    for (let r = 0; r < ROWS; r++) rows.push(grid.slice(r * COLS, r * COLS + COLS));
+    renderDebug(rows);
     saveToURL();
   }
 
-  function renderDebug() {
-    // Build 2D array (3 rows × 15 cols)
-    const rows = [];
-    for (let r = 0; r < ROWS; r++) {
-      rows.push(grid.slice(r * COLS, r * COLS + COLS));
-    }
-
-    const cloudBody = { characters: rows };
-    const localBody = rows; // raw array of arrays
-
-    document.getElementById('cloud-output').textContent =
-      JSON.stringify(cloudBody, null, 2);
-    document.getElementById('local-output').textContent =
-      JSON.stringify(localBody, null, 2);
+  // ── Score Display ──────────────────────────────────────────────────────────
+  function getGames() {
+    return document.getElementById('game-names').value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
   }
 
-  // ── Keyboard ───────────────────────────────────────────────────────────────
+  function renderDisplayFrame() {
+    const games = getGames();
+    if (games.length === 0) return;
+
+    const gameName = games[displayGameIndex % games.length];
+    document.getElementById('current-game-name').textContent = gameName;
+
+    const p1name  = document.getElementById('p1-name').value || 'P1';
+    const p1score = document.getElementById('p1-score').value || '0';
+    const p2name  = document.getElementById('p2-name').value || 'P2';
+    const p2score = document.getElementById('p2-score').value || '0';
+
+    const row0 = textToRow(gameName);
+    const row1 = scoreToRow(p1name, p1score);
+    const row2 = scoreToRow(p2name, p2score);
+
+    const displayGrid = [...row0, ...row1, ...row2];
+    renderBoard(displayGrid);
+    renderDebug([row0, row1, row2]);
+    saveToURL();
+  }
+
+  function startDisplayRotation() {
+    stopDisplayRotation();
+    renderDisplayFrame();
+    displayTimer = setInterval(() => {
+      const games = getGames();
+      if (games.length > 1) displayGameIndex = (displayGameIndex + 1) % games.length;
+      renderDisplayFrame();
+    }, 5000);
+  }
+
+  function stopDisplayRotation() {
+    if (displayTimer) { clearInterval(displayTimer); displayTimer = null; }
+  }
+
+  // ── Mode switching ─────────────────────────────────────────────────────────
+  function applyMode(mode) {
+    currentMode = mode;
+    modeSelect.value = mode;
+
+    if (mode === 'editor') {
+      boardTitle.textContent = 'Vestaboard Note Editor — 3 × 15';
+      controlsEl.classList.remove('hidden');
+      sdPanel.classList.add('hidden');
+      stopDisplayRotation();
+      renderEditor();
+    } else {
+      boardTitle.textContent = 'Vestaboard Note Preview — Score Display';
+      controlsEl.classList.add('hidden');
+      sdPanel.classList.remove('hidden');
+      displayGameIndex = 0;
+      startDisplayRotation();
+    }
+  }
+
+  modeSelect.addEventListener('change', () => applyMode(modeSelect.value));
+
+  // Re-render display when any score/game field changes
+  ['game-names','p1-name','p1-score','p2-name','p2-score'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      if (currentMode === 'display') {
+        displayGameIndex = 0;
+        startDisplayRotation(); // restart so timer resets to the first game
+      }
+      saveToURL();
+    });
+  });
+
+  // ── Keyboard (editor mode only) ────────────────────────────────────────────
   let digitBuffer = '';
   let digitTimer = null;
 
@@ -327,32 +657,31 @@
     const code = parseInt(digitBuffer, 10);
     if (!isNaN(code) && code >= 0 && code <= MAX_CODE) {
       grid[cursor] = code;
-      render();
+      renderEditor();
     }
     digitBuffer = '';
     digitTimer = null;
   }
 
   document.addEventListener('keydown', (e) => {
+    if (currentMode !== 'editor') return;
+    // Don't hijack keyboard when user is typing in a field
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+
     const { key, shiftKey } = e;
 
-    // Prevent page scroll on arrow keys
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) {
       e.preventDefault();
     }
 
-    // ── Digit input ──────────────────────────────────────
     if (/^\d$/.test(key)) {
       clearTimeout(digitTimer);
       digitBuffer += key;
-      // Auto-commit if buffer would exceed 2 digits or value > 71
       const tentative = parseInt(digitBuffer, 10);
       if (digitBuffer.length >= 2 || tentative > 71) {
         if (digitBuffer.length > 1) {
-          // check if last digit made it invalid
           const prev = parseInt(digitBuffer.slice(0, -1), 10);
           if (prev >= 0 && prev <= MAX_CODE) {
-            // commit previous, start fresh with new digit
             const newDigit = key;
             digitBuffer = digitBuffer.slice(0, -1);
             commitDigitBuffer();
@@ -364,26 +693,15 @@
           commitDigitBuffer();
         }
       }
-      // Wait 600 ms for more digits
       digitTimer = setTimeout(commitDigitBuffer, 600);
       return;
     }
 
-    // Commit any pending digit on non-digit key
-    if (digitTimer) {
-      clearTimeout(digitTimer);
-      commitDigitBuffer();
-    }
+    if (digitTimer) { clearTimeout(digitTimer); commitDigitBuffer(); }
 
     switch (key) {
-      case 'ArrowRight': {
-        cursor = (cursor + 1) % TOTAL;
-        break;
-      }
-      case 'ArrowLeft': {
-        cursor = (cursor - 1 + TOTAL) % TOTAL;
-        break;
-      }
+      case 'ArrowRight': cursor = (cursor + 1) % TOTAL; break;
+      case 'ArrowLeft':  cursor = (cursor - 1 + TOTAL) % TOTAL; break;
       case 'ArrowUp': {
         const step = shiftKey ? 10 : 1;
         grid[cursor] = (grid[cursor] + step) % (MAX_CODE + 1);
@@ -394,15 +712,15 @@
         grid[cursor] = (grid[cursor] - step + MAX_CODE + 1) % (MAX_CODE + 1);
         break;
       }
-      default:
-        return;
+      default: return;
     }
 
-    render();
+    renderEditor();
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
-  render();
+  loadFromURL();
+  applyMode(currentMode);
 </script>
 </body>
 </html>
