@@ -125,14 +125,22 @@ A manual cell-by-cell editor for the 3×15 board. The active cell is highlighted
 Automatically composes and previews a scoreboard layout on the 3×15 board:
 
 - **Row 1** — current pinball machine name, centered
-- **Row 2** — top score: `NAME   SCORE` formatted to fill 15 columns
-- **Row 3** — second-highest score in the same format
+- **Row 2** — first player entry that has a name, formatted as `NAME   SCORE` to fill 15 columns
+- **Row 3** — second player entry with a name, same format; blank if fewer than two named entries
 
-The machine name cycles through a user-provided list (one game per line in a textarea) every 5 seconds. Scores and player names are entered in simple input fields on the page.
+If a player entry has no name it is skipped entirely, so a single named entry always appears on row 2 regardless of whether it is player 1 or player 2.
 
-Editing any field restarts the rotation from the first game.
+**Score table** — a collapsable table below the game names list with one row per game. Columns: Game | #1 Name | #1 Score | #2 Name | #2 Score. All name and score cells are inline-editable. New games are pre-filled with default values; edits to existing rows are preserved when the game list changes. The currently displayed game is highlighted in the table.
 
-URL params: `?mode=display&games=<encoded list>&p1n=<name>&p1s=<score>&p2n=<name>&p2s=<score>`
+The machine name cycles through the list every 5 seconds. Editing the game names list rebuilds the table and restarts rotation from the first game.
+
+URL params: `?mode=display&games=<url-encoded newline-separated list>&scores=<url-encoded JSON array of [game, p1n, p1s, p2n, p2s] tuples>`
+
+### Split-Flap Animation
+
+When a cell's value changes, it plays a CSS animation simulating the physical flap mechanism — cycling through intermediate character codes along the shortest path on the valid-code wheel before landing on the target value. Invalid codes (not on the wheel) snap instantly with no animation.
+
+Each cell animates independently via a `setTimeout` chain. If a new change arrives while a cell is still animating, it cancels immediately and snaps to the new target to prevent UI hangs. Arrow key repeats are throttled to 60ms to stay within the animation budget.
 
 ### Debug Panel
 
@@ -150,4 +158,4 @@ The panel updates on every change.
 - Hosted on [fly.io](https://fly.io), app name: `vestaboard-pinball`, region: `iad`
 - Auto-deploys on push to GitHub via `.github/` workflows
 - Served from `public/` on port 80 inside a Docker container (see `Dockerfile` and `serve.sh`)
-- Local dev: `./serve.sh`
+- Local dev: `./serve.sh` — mounts `nginx.dev.conf` which disables HTML caching so changes are picked up immediately without rebuilding the image
