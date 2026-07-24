@@ -84,17 +84,16 @@
       overflow: hidden;
     }
 
-    /* Split-flap flip — top half folds down */
+    /* Split-flap flip — cheap opacity pulse, no layout reflow needed */
     @keyframes flap {
-      0%   { transform: scaleY(1);    opacity: 1; }
-      40%  { transform: scaleY(0.05); opacity: 0.6; }
-      60%  { transform: scaleY(0.05); opacity: 0.6; }
-      100% { transform: scaleY(1);    opacity: 1; }
+      0%   { opacity: 1;    transform: scaleY(1); }
+      35%  { opacity: 0.25; transform: scaleY(0.15); }
+      65%  { opacity: 0.25; transform: scaleY(0.15); }
+      100% { opacity: 1;    transform: scaleY(1); }
     }
 
-    .cell.flipping {
-      animation: flap 80ms ease-in-out;
-    }
+    .cell.flipping-a { animation: flap 55ms ease-in-out; }
+    .cell.flipping-b { animation: flap 55ms ease-in-out; }
 
     /* colour chip display colours */
     .cell[data-code="0"]  { background: #1a1a1a; color: #444; }
@@ -569,7 +568,8 @@ Funhouse</textarea>
     63,64,65,66,67,68,69,70,71,
   ];
 
-  let flipIntervalId = null;
+  // Per-cell animation state: null means idle, otherwise a timeout id
+  const cellTimers = Array.from({ length: TOTAL }, () => null);
 
   // Immediately set a cell's visual state with no animation
   function setCellValue(i, code) {
@@ -582,79 +582,74 @@ Funhouse</textarea>
     displayedCodes[i] = code;
   }
 
-  // Trigger a single CSS flap on a cell
-  function triggerFlap(el) {
-    el.classList.remove('flipping');
-    // Force reflow so removing+re-adding the class restarts the animation
-    void el.offsetWidth;
-    el.classList.add('flipping');
+  // Animate a single cell through its sequence of codes, one flap per STEP_MS.
+  // If the cell is already animating, cancel it and jump straight to the target.
+  function animateCell(i, steps) {
+    // Already mid-animation — cancel and snap to target immediately.
+    // Use a sentinel (-1) so the guard works even before the first setTimeout fires.
+    if (cellTimers[i] !== null) {
+      clearTimeout(cellTimers[i]);
+      cellTimers[i] = null;
+      setCellValue(i, steps[steps.length - 1]);
+      cellEls[i].classList.remove('flipping-a', 'flipping-b');
+      return;
+    }
+
+    const STEP_MS = 60;
+
+    // Mark as busy immediately (synchronously) before any async work
+    cellTimers[i] = -1;
+
+    function scheduleStep(stepIdx, flipClass) {
+      const el = cellEls[i];
+      setCellValue(i, steps[stepIdx]);
+      // Alternate between flipping-a and flipping-b so the browser sees a
+      // genuine class change each time — no forced reflow needed
+      el.classList.remove('flipping-a', 'flipping-b');
+      el.classList.add(flipClass);
+
+      if (stepIdx < steps.length - 1) {
+        const next = flipClass === 'flipping-a' ? 'flipping-b' : 'flipping-a';
+        cellTimers[i] = setTimeout(() => scheduleStep(stepIdx + 1, next), STEP_MS);
+      } else {
+        cellTimers[i] = null;
+      }
+    }
+
+    scheduleStep(0, 'flipping-a');
   }
 
-  // Animate cells that are changing to their new target codes.
-  // Each cell steps forward through ORDERED_CODES one code at a time toward its target.
+  // Build the ordered step sequence from one code to another (shortest path).
+  // Invalid codes (not on the wheel) are shown as a single instant snap.
+  function buildSteps(from, to) {
+    const len     = ORDERED_CODES.length;
+    const fromIdx = ORDERED_CODES.indexOf(from);
+    const toIdx   = ORDERED_CODES.indexOf(to);
+
+    // If either code is invalid (not on the wheel), just snap directly
+    if (fromIdx === -1 || toIdx === -1) return [to];
+
+    const forwardDist  = ((toIdx - fromIdx) + len) % len;
+    const backwardDist = ((fromIdx - toIdx) + len) % len;
+    const goForward    = forwardDist <= backwardDist;
+
+    const steps = [];
+    let idx = fromIdx;
+    while (true) {
+      idx = goForward ? (idx + 1) % len : (idx - 1 + len) % len;
+      steps.push(ORDERED_CODES[idx]);
+      if (idx === toIdx) break;
+    }
+    return steps;
+  }
+
   function animateCells(targetGrid) {
-    // Stop any in-progress animation
-    if (flipIntervalId) { clearInterval(flipIntervalId); flipIntervalId = null; }
-
-    const STEP_MS = 40; // ms per flap tick
-
-    // Identify which cells are changing and build their full step sequences
-    const changing = []; // { index, steps: [code, ...] }
-
     for (let i = 0; i < TOTAL; i++) {
       const from = displayedCodes[i];
       const to   = targetGrid[i];
       if (from === to) continue;
-
-      const fromIdx = ORDERED_CODES.indexOf(from);
-      const toIdx   = ORDERED_CODES.indexOf(to);
-      const len     = ORDERED_CODES.length;
-
-      const forwardDist  = ((toIdx - fromIdx) + len) % len;
-      const backwardDist = ((fromIdx - toIdx) + len) % len;
-      const goForward    = forwardDist <= backwardDist;
-
-      // Walk the shortest direction on the wheel toward the target
-      const steps = [];
-      let idx = fromIdx;
-      while (true) {
-        idx = goForward ? (idx + 1) % len : (idx - 1 + len) % len;
-        steps.push(ORDERED_CODES[idx]);
-        if (idx === toIdx) break;
-      }
-
-      changing.push({ index: i, steps });
+      animateCell(i, buildSteps(from, to));
     }
-
-    if (changing.length === 0) return;
-
-    // All cells share the same tick count — use the longest sequence so every
-    // cell finishes at the same time, skipping intermediate frames for shorter ones.
-    const maxSteps = Math.max(...changing.map(c => c.steps.length));
-
-    let tick = 0;
-    flipIntervalId = setInterval(() => {
-      tick++;
-      for (const { index, steps } of changing) {
-        // Map this tick proportionally into this cell's step sequence so all
-        // cells start and finish together, each stepping through its own codes
-        const pos = Math.min(
-          Math.round((tick / maxSteps) * steps.length) - 1,
-          steps.length - 1
-        );
-        const code = steps[Math.max(pos, 0)];
-        setCellValue(index, code);
-        triggerFlap(cellEls[index]);
-      }
-      if (tick >= maxSteps) {
-        clearInterval(flipIntervalId);
-        flipIntervalId = null;
-        // Guarantee every cell lands exactly on its target
-        for (const { index, steps } of changing) {
-          setCellValue(index, steps[steps.length - 1]);
-        }
-      }
-    }, STEP_MS);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -751,7 +746,10 @@ Funhouse</textarea>
     }
   }
 
-  modeSelect.addEventListener('change', () => applyMode(modeSelect.value));
+  modeSelect.addEventListener('change', () => {
+    applyMode(modeSelect.value);
+    modeSelect.blur();
+  });
 
   // Re-render display when any score/game field changes
   ['game-names','p1-name','p1-score','p2-name','p2-score'].forEach(id => {
@@ -779,6 +777,10 @@ Funhouse</textarea>
     digitTimer = null;
   }
 
+  // Debounce held arrow keys — only process one event per ARROW_DEBOUNCE_MS
+  const ARROW_DEBOUNCE_MS = 60;
+  const arrowLastFired = {};
+
   document.addEventListener('keydown', (e) => {
     if (currentMode !== 'editor') return;
     // Don't hijack keyboard when user is typing in a field
@@ -788,6 +790,9 @@ Funhouse</textarea>
 
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) {
       e.preventDefault();
+      const now = Date.now();
+      if (now - (arrowLastFired[key] ?? 0) < ARROW_DEBOUNCE_MS) return;
+      arrowLastFired[key] = now;
     }
 
     if (/^\d$/.test(key)) {
