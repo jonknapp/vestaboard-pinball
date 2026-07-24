@@ -196,7 +196,7 @@
       letter-spacing: 0.06em;
     }
 
-    .sd-field input, .sd-field textarea {
+    .sd-field textarea {
       background: #1e1e1e;
       color: #e0e0e0;
       border: 1px solid #333;
@@ -204,62 +204,88 @@
       padding: 6px 8px;
       font-family: inherit;
       font-size: 0.82rem;
-    }
-
-    .sd-field input:focus, .sd-field textarea:focus {
-      outline: 1px solid #f0a500;
-    }
-
-    .sd-field textarea {
       resize: vertical;
       min-height: 90px;
       width: 220px;
     }
 
-    .sd-field input[type="text"] { width: 160px; }
-    .sd-field input[type="number"] { width: 110px; }
+    .sd-field textarea:focus { outline: 1px solid #f0a500; }
 
-    .score-entry {
+    /* ── Scores table ───────────────────────────────────── */
+    #scores-section {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 4px;
-      padding: 8px 10px;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    .score-entry label {
-      font-size: 0.7rem;
+    #scores-toggle {
+      background: none;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #888;
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      align-self: flex-start;
+    }
+
+    #scores-toggle:hover { border-color: #555; color: #bbb; }
+
+    #scores-table-wrap {
+      overflow-x: auto;
+    }
+
+    #scores-table {
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      min-width: 500px;
+    }
+
+    #scores-table th {
+      text-align: left;
+      padding: 5px 8px;
       color: #666;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      font-size: 0.68rem;
+      border-bottom: 1px solid #2a2a2a;
       white-space: nowrap;
     }
 
-    .score-entry input[type="text"] {
-      background: #222;
-      color: #e0e0e0;
-      border: 1px solid #333;
-      border-radius: 3px;
+    #scores-table td {
       padding: 4px 6px;
-      font-family: inherit;
-      font-size: 0.82rem;
-      width: 120px;
+      border-bottom: 1px solid #1e1e1e;
+      color: #aaa;
     }
 
-    .score-entry input[type="number"] {
-      background: #222;
-      color: #e0e0e0;
-      border: 1px solid #333;
-      border-radius: 3px;
-      padding: 4px 6px;
-      font-family: inherit;
-      font-size: 0.82rem;
-      width: 100px;
+    #scores-table td.game-name-cell {
+      color: #666;
+      white-space: nowrap;
+      padding-right: 12px;
     }
 
-    .score-entry input:focus { outline: 1px solid #f0a500; }
+    #scores-table td.active-game {
+      color: #f0a500;
+    }
+
+    #scores-table input[type="text"],
+    #scores-table input[type="number"] {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      padding: 3px 6px;
+      font-family: inherit;
+      font-size: 0.78rem;
+      width: 100%;
+    }
+
+    #scores-table input[type="number"] { width: 90px; }
+    #scores-table input[type="text"]   { width: 80px; }
+    #scores-table input:focus { outline: 1px solid #f0a500; border-color: #f0a500; }
 
     #rotation-status {
       font-size: 0.72rem;
@@ -352,18 +378,23 @@ The Addams Family
 Twilight Zone
 Funhouse</textarea>
       </div>
+    </div>
 
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <div class="score-entry">
-          <label>#1</label>
-          <input type="text" id="p1-name" placeholder="Player name" value="ACE" maxlength="10" />
-          <input type="number" id="p1-score" placeholder="Score" value="1250000" min="0" />
-        </div>
-        <div class="score-entry">
-          <label>#2</label>
-          <input type="text" id="p2-name" placeholder="Player name" value="BOB" maxlength="10" />
-          <input type="number" id="p2-score" placeholder="Score" value="980000" min="0" />
-        </div>
+    <div id="scores-section">
+      <button id="scores-toggle">&#9660; Scores</button>
+      <div id="scores-table-wrap">
+        <table id="scores-table">
+          <thead>
+            <tr>
+              <th>Game</th>
+              <th>#1 Name</th>
+              <th>#1 Score</th>
+              <th>#2 Name</th>
+              <th>#2 Score</th>
+            </tr>
+          </thead>
+          <tbody id="scores-tbody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -468,24 +499,47 @@ Funhouse</textarea>
   let displayGameIndex = 0;
   let displayTimer = null;
 
+  // Default score data keyed by game name
+  const DEFAULT_SCORES = {
+    'Attack From Mars':  { p1n: 'STARLORD', p1s: 9500000,  p2n: 'RIPLEY',  p2s: 7200000  },
+    'Medieval Madness':  { p1n: 'MERLIN',   p1s: 4800000,  p2n: 'LANCELOT',p2s: 3100000  },
+    'The Addams Family': { p1n: 'GOMEZ',    p1s: 82000000, p2n: 'MORTICIA', p2s: 61000000 },
+    'Twilight Zone':     { p1n: 'SERLING',  p1s: 1200000,  p2n: 'TWILIGHT', p2s: 950000   },
+    'Funhouse':          { p1n: 'RUDY',     p1s: 6700000,  p2n: 'JESTER',   p2s: 5400000  },
+  };
+
+  // Live score table: array of { game, p1n, p1s, p2n, p2s }
+  // Rebuilt from the game-names textarea + DEFAULT_SCORES on load/change
+  let scoreRows = [];
+
+  function buildScoreRows() {
+    const games = document.getElementById('game-names').value
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    // Preserve any edits already in scoreRows, fill new games from defaults
+    const existing = Object.fromEntries(scoreRows.map(r => [r.game, r]));
+    scoreRows = games.map(game => {
+      if (existing[game]) return existing[game];
+      const def = DEFAULT_SCORES[game] ?? { p1n: '', p1s: 0, p2n: '', p2s: 0 };
+      return { game, ...def };
+    });
+  }
+
   // ── URL persistence ────────────────────────────────────────────────────────
   function saveToURL() {
     const params = new URLSearchParams(window.location.search);
-
     params.set('mode', currentMode);
 
     if (currentMode === 'editor') {
       params.set('b', grid.join(','));
       params.delete('games');
-      params.delete('p1n'); params.delete('p1s');
-      params.delete('p2n'); params.delete('p2s');
+      params.delete('scores');
     } else {
       params.delete('b');
       params.set('games', encodeURIComponent(document.getElementById('game-names').value));
-      params.set('p1n', document.getElementById('p1-name').value);
-      params.set('p1s', document.getElementById('p1-score').value);
-      params.set('p2n', document.getElementById('p2-name').value);
-      params.set('p2s', document.getElementById('p2-score').value);
+      // Serialize scoreRows as compact JSON
+      params.set('scores', encodeURIComponent(JSON.stringify(
+        scoreRows.map(r => [r.game, r.p1n, r.p1s, r.p2n, r.p2s])
+      )));
     }
 
     history.replaceState(null, '', '?' + params.toString());
@@ -496,9 +550,7 @@ Funhouse</textarea>
 
     // Mode
     const savedMode = params.get('mode');
-    if (savedMode === 'display' || savedMode === 'editor') {
-      currentMode = savedMode;
-    }
+    if (savedMode === 'display' || savedMode === 'editor') currentMode = savedMode;
 
     // Editor grid
     const raw = params.get('b');
@@ -512,14 +564,20 @@ Funhouse</textarea>
       }
     }
 
-    // Display mode fields
+    // Game names
     if (params.get('games')) {
       document.getElementById('game-names').value = decodeURIComponent(params.get('games'));
     }
-    if (params.get('p1n')) document.getElementById('p1-name').value = params.get('p1n');
-    if (params.get('p1s')) document.getElementById('p1-score').value = params.get('p1s');
-    if (params.get('p2n')) document.getElementById('p2-name').value = params.get('p2n');
-    if (params.get('p2s')) document.getElementById('p2-score').value = params.get('p2s');
+
+    // Score rows — restore from URL if present, otherwise build from defaults
+    if (params.get('scores')) {
+      try {
+        const saved = JSON.parse(decodeURIComponent(params.get('scores')));
+        scoreRows = saved.map(([game, p1n, p1s, p2n, p2s]) => ({ game, p1n, p1s, p2n, p2s }));
+      } catch (_) { buildScoreRows(); }
+    } else {
+      buildScoreRows();
+    }
   }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -683,41 +741,80 @@ Funhouse</textarea>
   }
 
   // ── Score Display ──────────────────────────────────────────────────────────
-  function getGames() {
-    return document.getElementById('game-names').value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+
+  // ── Scores table DOM ───────────────────────────────────────────────────────
+  // Full rebuild — only called when the set of rows changes (game list edited)
+  function renderScoresTable() {
+    const tbody = document.getElementById('scores-tbody');
+    tbody.innerHTML = '';
+    scoreRows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.dataset.idx = idx;
+
+      tr.innerHTML = `
+        <td class="game-name-cell">${row.game}</td>
+        <td><input type="text"   value="${row.p1n}" maxlength="8" data-idx="${idx}" data-field="p1n" /></td>
+        <td><input type="number" value="${row.p1s}" min="0"       data-idx="${idx}" data-field="p1s" /></td>
+        <td><input type="text"   value="${row.p2n}" maxlength="8" data-idx="${idx}" data-field="p2n" /></td>
+        <td><input type="number" value="${row.p2s}" min="0"       data-idx="${idx}" data-field="p2s" /></td>
+      `;
+
+      tr.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', () => {
+          const i = +input.dataset.idx;
+          const field = input.dataset.field;
+          scoreRows[i][field] = field.endsWith('s') ? Number(input.value) : input.value;
+          if (currentMode === 'display') renderDisplayFrame(false);
+          saveToURL();
+        });
+        input.addEventListener('keydown', e => e.stopPropagation());
+      });
+
+      tbody.appendChild(tr);
+    });
+    updateActiveGameHighlight();
+  }
+
+  // Cheaply update just the active-game highlight without touching inputs
+  function updateActiveGameHighlight() {
+    const tbody = document.getElementById('scores-tbody');
+    const activeIdx = displayGameIndex % Math.max(scoreRows.length, 1);
+    tbody.querySelectorAll('tr').forEach((tr, idx) => {
+      tr.querySelector('.game-name-cell').classList.toggle('active-game', idx === activeIdx);
+    });
   }
 
   function renderDisplayFrame(animate = true) {
-    const games = getGames();
-    if (games.length === 0) return;
+    if (scoreRows.length === 0) return;
 
-    const gameName = games[displayGameIndex % games.length];
-    document.getElementById('current-game-name').textContent = gameName;
+    const row = scoreRows[displayGameIndex % scoreRows.length];
+    document.getElementById('current-game-name').textContent = row.game;
 
-    const p1name  = document.getElementById('p1-name').value || 'P1';
-    const p1score = document.getElementById('p1-score').value || '0';
-    const p2name  = document.getElementById('p2-name').value || 'P2';
-    const p2score = document.getElementById('p2-score').value || '0';
+    const row0 = textToRow(row.game);
 
-    const row0 = textToRow(gameName);
-    const row1 = scoreToRow(p1name, p1score);
-    const row2 = scoreToRow(p2name, p2score);
+    // Collect only entries that have a name
+    const entries = [
+      row.p1n ? { name: String(row.p1n), score: String(row.p1s || 0) } : null,
+      row.p2n ? { name: String(row.p2n), score: String(row.p2s || 0) } : null,
+    ].filter(Boolean);
+
+    const row1 = entries[0] ? scoreToRow(entries[0].name, entries[0].score) : Array(COLS).fill(0);
+    const row2 = entries[1] ? scoreToRow(entries[1].name, entries[1].score) : Array(COLS).fill(0);
 
     const displayGrid = [...row0, ...row1, ...row2];
     renderBoard(displayGrid, animate);
     renderDebug([row0, row1, row2]);
+    updateActiveGameHighlight(); // only touch the highlight, not the inputs
     saveToURL();
   }
 
   function startDisplayRotation(initial = false) {
     stopDisplayRotation();
+    buildScoreRows();
+    renderScoresTable();
     renderDisplayFrame(!initial);
     displayTimer = setInterval(() => {
-      const games = getGames();
-      if (games.length > 1) displayGameIndex = (displayGameIndex + 1) % games.length;
+      if (scoreRows.length > 1) displayGameIndex = (displayGameIndex + 1) % scoreRows.length;
       renderDisplayFrame(true);
     }, 5000);
   }
@@ -751,15 +848,23 @@ Funhouse</textarea>
     modeSelect.blur();
   });
 
-  // Re-render display when any score/game field changes
-  ['game-names','p1-name','p1-score','p2-name','p2-score'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      if (currentMode === 'display') {
-        displayGameIndex = 0;
-        startDisplayRotation(); // restart so timer resets to the first game
-      }
-      saveToURL();
-    });
+  // Re-render when game names list changes
+  document.getElementById('game-names').addEventListener('input', () => {
+    if (currentMode === 'display') {
+      displayGameIndex = 0;
+      startDisplayRotation();
+    }
+    saveToURL();
+  });
+
+  // Collapsable scores table
+  const scoresToggle   = document.getElementById('scores-toggle');
+  const scoresTableWrap = document.getElementById('scores-table-wrap');
+  let scoresCollapsed = false;
+  scoresToggle.addEventListener('click', () => {
+    scoresCollapsed = !scoresCollapsed;
+    scoresTableWrap.classList.toggle('hidden', scoresCollapsed);
+    scoresToggle.textContent = (scoresCollapsed ? '▶' : '▼') + ' Scores';
   });
 
   // ── Keyboard (editor mode only) ────────────────────────────────────────────
