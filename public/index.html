@@ -610,13 +610,17 @@ Funhouse</textarea>
       const toIdx   = ORDERED_CODES.indexOf(to);
       const len     = ORDERED_CODES.length;
 
-      // Walk forward on the wheel from fromIdx+1 up to and including toIdx
+      const forwardDist  = ((toIdx - fromIdx) + len) % len;
+      const backwardDist = ((fromIdx - toIdx) + len) % len;
+      const goForward    = forwardDist <= backwardDist;
+
+      // Walk the shortest direction on the wheel toward the target
       const steps = [];
-      let idx = (fromIdx + 1) % len;
+      let idx = fromIdx;
       while (true) {
+        idx = goForward ? (idx + 1) % len : (idx - 1 + len) % len;
         steps.push(ORDERED_CODES[idx]);
         if (idx === toIdx) break;
-        idx = (idx + 1) % len;
       }
 
       changing.push({ index: i, steps });
